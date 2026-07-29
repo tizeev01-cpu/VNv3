@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, maximum-scale=1.0">
+  <meta name="color-scheme" content="only dark">
+  <title>Визуальные Заметки</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    body, html { 
+      width: 100%; height: 100%; overflow: hidden; 
+      background: #0a0a0a; color: #fff; 
+      font-family: system-ui, -apple-system, sans-serif; 
+    }
+    
+    #canvas-container {
+      width: 100vw; height: 100vh; position: relative; 
+      overflow: hidden; touch-action: none;
+      background-image: radial-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+      background-size: 24px 24px;
+    }
+    
+    #world {
+      position: absolute; width: 4000px; height: 4000px;
+      transform-origin: 0 0; top: 0; left: 0;
+      will-change: transform;
+      transform-style: preserve-3d;
+      backface-visibility: hidden;
+    }
+
+    svg { position: absolute; width: 100%; height: 100%; pointer-events: none; }
+    path.node-line { fill: none; stroke: rgba(255, 255, 255, 0.5); stroke-width: 2; }
+    path.box-line { fill: none; stroke: rgba(255, 255, 255, 0.25); stroke-width: 1.5; stroke-dasharray: 4 4; }
+
+    /* Главный узел */
+    .node {
+      position: absolute; display: flex; flex-direction: column; align-items: center;
+      transform: translate3d(-50%, 0, 0); z-index: 3;
+      will-change: left, top;
+    }
+
+    /* Точка */
+    .node-dot {
+      width: 28px; height: 28px; border-radius: 50%; border: 2.5px solid #fff;
+      background: #000; display: flex; align-items: center; justify-content: center;
+      cursor: grab; transition: background 0.2s, box-shadow 0.2s;
+      touch-action: none;
+    }
+
+    .node-dot.selected {
+      background: #fff; box-shadow: 0 0 16px rgba(255,255,255,0.9);
+    }
+
+    .node-dot-inner {
+      width: 8px; height: 8px; border-radius: 50%; background: #fff; pointer-events: none;
+    }
+
+    .node-dot.selected .node-dot-inner { background: #000; }
+
+    /* Редактирование заголовка */
+    .node-title-input {
+      margin-top: 4px; background: rgba(0,0,0,0.85); padding: 3px 8px;
+      border-radius: 4px; border: 1px solid rgba(255,255,255,0.25);
+      font-size: 13px; font-weight: bold; color: #fff; text-align: center;
+      outline: none; min-width: 80px; max-width: 190px; font-family: inherit;
+      user-select: text; -webkit-user-select: text;
+    }
+    .node-title-input:focus {
+      border-color: #fff; background: rgba(20,20,20,0.95);
+    }
+
+    /* Мини-панель инструментов */
+    .node-toolbar {
+      position: absolute; top: -38px; display: none; gap: 4px;
+      background: #1e1e1e; border: 1px solid #444; border-radius: 8px;
+      padding: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.7); z-index: 10;
+      white-space: nowrap;
+    }
+
+    .node-toolbar.active { display: flex; }
+
+    .tool-btn {
+      background: #333; color: #fff; border: none; padding: 4px 8px;
+      border-radius: 4px; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 2px;
+    }
+    .tool-btn:active { background: #555; }
+    .tool-btn.danger { color: #ff5252; }
+
+    /* Свободно перемещаемая карточка */
+    .draggable-box {
+      position: absolute; background: rgba(20, 20, 20, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.3); border-radius: 8px;
+      padding: 6px; display: flex; flex-direction: column; gap: 6px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.8); backdrop-filter: blur(4px);
+      z-index: 2; transform: translate3d(-50%, 0, 0);
+      will-change: left, top, width;
+    }
+
+    /* Шапка перетаскивания поля */
+    .box-drag-handle {
+      width: 100%; height: 16px; background: rgba(255,255,255,0.08);
+      border-radius: 4px; cursor: move; display: flex; align-items: center;
+      justify-content: space-between; padding: 0 6px; color: #888; font-size: 10px;
+      touch-action: none;
+    }
+
+    .btn-delete-box {
+      background: transparent; border: none; color: #888; 
+      font-size: 11px; cursor: pointer; line-height: 1;
+    }
+    .btn-delete-box:hover { color: #ff5252; }
+
+    .node-text-editor {
+      width: 100%; background: transparent; border: none; color: #ddd;
+      font-size: 13px; resize: none; outline: none; min-height: 38px;
+      font-family: inherit; line-height: 1.4; overflow: hidden;
+      user-select: text; -webkit-user-select: text;
+    }
+
+    /* Адаптированный контент карточек с фото */
+    .media-card-content {
+      width: 100%; display: flex; justify-content: center; align-items: center; overflow: hidden;
+      position: relative;
+    }
+
+    .media-card-content img { 
+      width: 100%; height: auto; max-height: none; object-fit: contain;
+      border-radius: 4px; display: block; pointer-events: none;
+    }
+    
+    .media-card-content audio { width: 100%; height: 32px; }
+
+    /* Кнопка изменения размера карточки в правом нижнем углу */
+    .resize-handle {
+      position: absolute; right: 0; bottom: 0; width: 18px; height: 18px;
+      cursor: se-resize; touch-action: none; display: flex; align-items: center;
+      justify-content: center; font-size: 10px; color: rgba(255,255,255,0.5);
+      border-top-left-radius: 4px; background: rgba(255,255,255,0.1);
+    }
+    .resize-handle:after {
+      content: '◢';
+    }
+
+    /* Панель верхних кнопок управления */
+    .top-controls {
+      position: fixed; top: 16px; left: 16px; z-index: 100;
+      display: flex; gap: 8px;
+    }
+
+    .control-btn {
+      background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.2);
+      padding: 8px 14px; border-radius: 20px; font-size: 12px; backdrop-filter: blur(5px);
+      cursor: pointer;
+    }
+    .control-btn:active { background: rgba(255,255,255,0.3); }
+  </style>
+</head>
+<body>
+
+  <div class="top-controls">
+    <button class="control-btn" onclick="undo()"> ↩ </button>
+    <button class="control-btn" onclick="centerCanvas()"> В центр</button>
+  </div>
+
+  <div id="canvas-container">
+    <div id="world">
+      <svg id="svg-lines"></svg>
+      <div id="nodes-container"></div>
+    </div>
+  </div>
+
+  <input type="file" id="file-input" style="display:none">
+
+  <script>
+    let nodes = {};
+    let activeToolbarId = null;
+    let currentAttachNodeId = null;
+
+    let historyStack = [];
+
+    // Параметры трансформы и тача
+    let scale = 1, panX = 0, panY = 0;
+    let isDraggingCanvas = false;
+    
+    let draggingTarget = null;
+    let dragStartX = 0, dragStartY = 0;
+    let startBoxWidth = 0;
+
+    let startPanX = 0, startPanY = 0;
+    let startScale = 1, startDistance = 0;
+    let isTransformPending = false;
+
+    const world = document.getElementById('world');
+    const container = document.getElementById('canvas-container');
+
+    function saveStateForUndo() {
+      if (historyStack.length > 20) historyStack.shift();
+      historyStack.push(JSON.stringify(nodes));
+    }
+
+    function undo() {
+      if (historyStack.length > 0) {
+        const previousState = historyStack.pop();
+        nodes = JSON.parse(previousState);
+        storageSave(nodes, false);
+        render();
+      }
+    }
+
+    function storageSave(data, pushUndo = true) {
+      if (pushUndo && Object.keys(data).length > 0) {
+        saveStateForUndo();
+      }
+      try { localStorage.setItem('visual_notes_v5_db', JSON.stringify(data)); } catch(e){}
+    }
+
+    function storageLoad() {
+      try {
+        const raw = localStorage.getItem('visual_notes_v5_db');
+        return raw ? JSON.parse(raw) : null;
+      } catch(e) { return null; }
+    }
+
+    function centerCanvas() {
+      scale = 1;
+      panX = (window.innerWidth / 2) - 2000;
+      panY = (window.innerHeight / 2) - 2000;
+      applyTransform();
+    }
+
+    function applyTransform() {
+      if (!isTransformPending) {
+        isTransformPending = true;
+        requestAnimationFrame(() => {
+          world.style.transform = `translate3d(${panX}px, ${panY}px, 0px) scale(${scale})`;
+          isTransformPending = false;
+        });
+      }
+    }
+
+    // ТАЧ И ИВЕНТ-ДВИЖОК
+    container.addEventListener('touchstart', e => {
+      const touch = e.touches[0];
+      const targetDot = e.target.closest('.node-dot');
+      const targetHandle = e.target.closest('.box-drag-handle');
+      const targetResize = e.target.closest('.resize-handle');
+
+      if (e.touches.length === 1 && targetDot) {
+        const nId = targetDot.dataset.id;
+        draggingTarget = { type: 'node', nodeId: nId };
+        dragStartX = (touch.clientX / scale) - nodes[nId].x;
+        dragStartY = (touch.clientY / scale) - nodes[nId].y;
+        return;
+      }
+
+      if (e.touches.length === 1 && targetResize) {
+        const boxEl = targetResize.closest('.draggable-box');
+        const nId = boxEl.dataset.nodeId;
+        const bId = boxEl.dataset.boxId;
+        const boxObj = nodes[nId].boxes.find(b => b.id === bId);
+
+        draggingTarget = { type: 'resize', nodeId: nId, boxId: bId };
+        dragStartX = touch.clientX / scale;
+        startBoxWidth = boxObj.width || 240;
+        return;
+      }
+
+      if (e.touches.length === 1 && targetHandle) {
+        const boxEl = targetHandle.closest('.draggable-box');
+        const nId = boxEl.dataset.nodeId;
+        const bId = boxEl.dataset.boxId;
+        const boxObj = nodes[nId].boxes.find(b => b.id === bId);
+
+        draggingTarget = { type: 'box', nodeId: nId, boxId: bId };
+        dragStartX = (touch.clientX / scale) - boxObj.offsetX;
+        dragStartY = (touch.clientY / scale) - boxObj.offsetY;
+        return;
+      }
+
+      if (e.target.closest('.node') || e.target.closest('.draggable-box') || e.target.closest('.top-controls')) return;
+
+      if (e.touches.length === 1) {
+        isDraggingCanvas = true;
+        startPanX = touch.clientX - panX;
+        startPanY = touch.clientY - panY;
+      } else if (e.touches.length === 2) {
+        isDraggingCanvas = false;
+        startScale = scale;
+        startDistance = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        startPanX = panX;
+        startPanY = panY;
+      }
+      
+      if (activeToolbarId) {
+        activeToolbarId = null;
+        renderToolbars();
+      }
+    }, { passive: false });
+
+    container.addEventListener('touchmove', e => {
+      e.preventDefault();
+
+      if (draggingTarget && e.touches.length === 1) {
+        const touch = e.touches[0];
+        if (draggingTarget.type === 'node') {
+          nodes[draggingTarget.nodeId].x = (touch.clientX / scale) - dragStartX;
+          nodes[draggingTarget.nodeId].y = (touch.clientY / scale) - dragStartY;
+        } else if (draggingTarget.type === 'box') {
+          const boxObj = nodes[draggingTarget.nodeId].boxes.find(b => b.id === draggingTarget.boxId);
+          if (boxObj) {
+            boxObj.offsetX = (touch.clientX / scale) - dragStartX;
+            boxObj.offsetY = (touch.clientY / scale) - dragStartY;
+          }
+        } else if (draggingTarget.type === 'resize') {
+          const boxObj = nodes[draggingTarget.nodeId].boxes.find(b => b.id === draggingTarget.boxId);
+          if (boxObj) {
+            const currentX = touch.clientX / scale;
+            const deltaX = currentX - dragStartX;
+            boxObj.width = Math.max(120, startBoxWidth + deltaX);
+          }
+        }
+        renderPositionsAndLines();
+        return;
+      }
+
+      if (isDraggingCanvas && e.touches.length === 1) {
+        panX = e.touches[0].clientX - startPanX;
+        panY = e.touches[0].clientY - startPanY;
+        applyTransform();
+        return;
+      }
+
+      // ПЛАВНЫЙ ЗУМ (Сглаженное приближение / отдаление)
+      if (e.touches.length === 2 && startDistance > 0) {
+        const currentDistance = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        
+        // Коэффициент чувствительности (0.5 делаeт масштаб плавной рессорой)
+        const rawZoomFactor = currentDistance / startDistance;
+        const smoothZoomFactor = 1 + (rawZoomFactor - 1) * 0.5;
+        
+        const newScale = Math.min(Math.max(startScale * smoothZoomFactor, 0.35), 2.5);
+        
+        const centerTouchX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        const centerTouchY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+
+        panX = centerTouchX - (centerTouchX - startPanX) * (newScale / startScale);
+        panY = centerTouchY - (centerTouchY - startPanY) * (newScale / startScale);
+        scale = newScale;
+
+        applyTransform();
+      }
+    }, { passive: false });
+
+    container.addEventListener('touchend', e => {
+      if (draggingTarget) {
+        storageSave(nodes, false);
+        draggingTarget = null;
+      }
+      if (e.touches.length < 2) startDistance = 0;
+      if (e.touches.length === 0) isDraggingCanvas = false;
+    });
+
+    function init() {
+      const saved = storageLoad();
+      if (saved && Object.keys(saved).length > 0) {
+        Object.values(saved).forEach(n => {
+          if (n.boxes) {
+            n.boxes.forEach(b => {
+              if (b.offsetX === undefined) b.offsetX = (b.x !== undefined ? b.x - n.x : 0);
+              if (b.offsetY === undefined) b.offsetY = (b.y !== undefined ? b.y - n.y : 50);
+              if (b.width === undefined) b.width = 240;
+            });
+          }
+        });
+        nodes = saved;
+      } else {
+        nodes = {
+          'root': {
+            id: 'root', title: 'Заметки', 
+            boxes: [{ id: 'b_root', type: 'text', text: 'Главная ветка', offsetX: 0, offsetY: 50, width: 240 }], 
+            parentId: null, childrenIds: [], x: 2000, y: 2000, isSelected: true
+          }
+        };
+        storageSave(nodes, false);
+      }
+      centerCanvas();
+      render();
+    }
+
+    function autoResizeTextarea(el) {
+      el.style.height = 'auto';
+      el.style.height = (el.scrollHeight) + 'px';
+    }
+
+    function isNodeVisible(node) {
+      if (node.id === 'root') return true;
+      let current = node;
+      while (current.parentId) {
+        const parent = nodes[current.parentId];
+        if (!parent || !parent.isSelected) return false;
+        current = parent;
+      }
+      return true;
+    }
+
+    function renderPositionsAndLines() {
+      const svgEl = document.getElementById('svg-lines');
+      svgEl.innerHTML = '';
+
+      Object.values(nodes).forEach(node => {
+        if (!isNodeVisible(node)) return;
+
+        const el = document.getElementById(`node-el-${node.id}`);
+        if (el) {
+          el.style.left = `${node.x}px`;
+          el.style.top = `${node.y}px`;
+        }
+
+        if (node.parentId && nodes[node.parentId]) {
+          const parent = nodes[node.parentId];
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          path.setAttribute('class', 'node-line');
+          
+          const startX = parent.x, startY = parent.y + 14;
+          const endX = node.x, endY = node.y + 14;
+          const deltaY = (endY - startY) / 2;
+          
+          path.setAttribute('d', `M ${startX} ${startY} C ${startX} ${startY + deltaY}, ${endX} ${endY - deltaY}, ${endX} ${endY}`);
+          svgEl.appendChild(path);
+        }
+
+        if (node.isSelected && node.boxes) {
+          node.boxes.forEach(box => {
+            const boxEl = document.getElementById(`box-el-${box.id}`);
+            const absoluteBoxX = node.x + box.offsetX;
+            const absoluteBoxY = node.y + box.offsetY;
+
+            if (boxEl) {
+              boxEl.style.left = `${absoluteBoxX}px`;
+              boxEl.style.top = `${absoluteBoxY}px`;
+              boxEl.style.width = `${box.width || 240}px`;
+            }
+
+            const boxPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+            boxPath.setAttribute('class', 'box-line');
+            boxPath.setAttribute('d', `M ${node.x} ${node.y + 14} L ${absoluteBoxX} ${absoluteBoxY}`);
+            svgEl.appendChild(boxPath);
+          });
+        }
+      });
+    }
+
+    function renderToolbars() {
+      Object.values(nodes).forEach(node => {
+        const tb = document.getElementById(`toolbar-${node.id}`);
+        if (tb) {
+          tb.classList.toggle('active', activeToolbarId === node.id);
+        }
+      });
+    }
+
+    function render() {
+      const containerEl = document.getElementById('nodes-container');
+      containerEl.innerHTML = '';
+
+      Object.values(nodes).forEach(node => {
+        if (!isNodeVisible(node)) return;
+
+        const div = document.createElement('div');
+        div.className = 'node';
+        div.id = `node-el-${node.id}`;
+
+        div.innerHTML = `
+          <div class="node-toolbar" id="toolbar-${node.id}">
+            <button class="tool-btn" onclick="addChild('${node.id}')">➕ Подзаметка</button>
+            <button class="tool-btn" onclick="addTextBox('${node.id}')">➕ Поле</button>
+            <button class="tool-btn" onclick="triggerFile('${node.id}', 'image')">📷 Фото</button>
+            <button class="tool-btn" onclick="triggerFile('${node.id}', 'audio')">🎙 Аудио</button>
+            ${node.id !== 'root' ? `<button class="tool-btn danger" onclick="deleteNode('${node.id}')">🗑</button>` : ''}
+          </div>
+
+          <div class="node-dot ${node.isSelected ? 'selected' : ''}" data-id="${node.id}" onclick="toggleSelect('${node.id}')">
+            <div class="node-dot-inner"></div>
+          </div>
+
+          <input class="node-title-input" value="${node.title}" 
+            onfocus="activeToolbarId = '${node.id}'; renderToolbars();"
+            oninput="updateTitle('${node.id}', this.value)"
+            onchange="updateTitle('${node.id}', this.value)" />
+        `;
+        containerEl.appendChild(div);
+
+        if (node.isSelected && node.boxes) {
+          node.boxes.forEach(box => {
+            const boxDiv = document.createElement('div');
+            boxDiv.className = 'draggable-box';
+            boxDiv.id = `box-el-${box.id}`;
+            boxDiv.dataset.nodeId = node.id;
+            boxDiv.dataset.boxId = box.id;
+
+            let innerBody = '';
+            if (box.type === 'image') {
+              innerBody = `<div class="media-card-content"><img src="${box.data}"></div><div class="resize-handle"></div>`;
+            } else if (box.type === 'audio') {
+              innerBody = `<div class="media-card-content"><audio controls src="${box.data}"></audio></div>`;
+            } else {
+              innerBody = `<textarea class="node-text-editor" placeholder="Напишите текст..." 
+                oninput="updateBoxContent('${node.id}', '${box.id}', this)"
+                onfocus="autoResizeTextarea(this)">${box.text || ''}</textarea><div class="resize-handle"></div>`;
+            }
+
+            boxDiv.innerHTML = `
+              <div class="box-drag-handle">
+                <span>::: </span>
+                <button class="btn-delete-box" onclick="removeBox('${node.id}', '${box.id}')">✕</button>
+              </div>
+              ${innerBody}
+            `;
+
+            containerEl.appendChild(boxDiv);
+
+            if (box.type === 'text') {
+              setTimeout(() => {
+                const txt = boxDiv.querySelector('.node-text-editor');
+                if (txt) autoResizeTextarea(txt);
+              }, 0);
+            }
+          });
+        }
+      });
+
+      renderPositionsAndLines();
+      renderToolbars();
+    }
+
+    function hideSubtree(nid) {
+      if (!nodes[nid]) return;
+      nodes[nid].isSelected = false;
+      nodes[nid].childrenIds.forEach(childId => {
+        hideSubtree(childId);
+      });
+    }
+
+    function toggleSelect(id) {
+      if (draggingTarget) return;
+      saveStateForUndo();
+
+      if (nodes[id].isSelected) {
+        hideSubtree(id);
+      } else {
+        nodes[id].isSelected = true;
+      }
+
+      storageSave(nodes, false);
+      render();
+    }
+
+    function updateTitle(id, newTitle) {
+      nodes[id].title = newTitle;
+      storageSave(nodes, false);
+    }
+
+    function updateBoxContent(nodeId, boxId, textarea) {
+      const box = nodes[nodeId].boxes.find(b => b.id === boxId);
+      if (box) {
+        box.text = textarea.value;
+        autoResizeTextarea(textarea);
+        storageSave(nodes, false);
+      }
+    }
+
+    function addTextBox(nodeId) {
+      saveStateForUndo();
+      const node = nodes[nodeId];
+      const count = node.boxes.length;
+      const newBox = {
+        id: 'box_' + Date.now(),
+        type: 'text',
+        text: '',
+        offsetX: (count * 40) - 40,
+        offsetY: 60 + (count * 30),
+        width: 240
+      };
+      node.boxes.push(newBox);
+      node.isSelected = true;
+      storageSave(nodes, false);
+      render();
+    }
+
+    function removeBox(nodeId, boxId) {
+      saveStateForUndo();
+      nodes[nodeId].boxes = nodes[nodeId].boxes.filter(b => b.id !== boxId);
+      storageSave(nodes, false);
+      render();
+    }
+
+    function addChild(parentId) {
+      saveStateForUndo();
+      const parent = nodes[parentId];
+      const newId = 'node_' + Date.now();
+      const count = parent.childrenIds.length;
+      const offsetX = (count % 2 === 0 ? 1 : -1) * (Math.floor(count / 2) + 1) * 170;
+      
+      const newX = parent.x + (offsetX === 0 ? 150 : offsetX);
+      const newY = parent.y + 180;
+
+      nodes[newId] = {
+        id: newId, 
+        title: 'Новая заметка', 
+        boxes: [{ id: 'box_' + Date.now(), type: 'text', text: '', offsetX: 0, offsetY: 50, width: 240 }], 
+        parentId: parent.id,
+        childrenIds: [], 
+        x: newX,
+        y: newY, 
+        isSelected: true
+      };
+
+      parent.childrenIds.push(newId);
+      activeToolbarId = null;
+      storageSave(nodes, false);
+      render();
+    }
+
+    function deleteNode(id) {
+      if (id === 'root') return;
+      saveStateForUndo();
+      function deleteRecursive(nid) {
+        if(!nodes[nid]) return;
+        nodes[nid].childrenIds.forEach(deleteRecursive);
+        delete nodes[nid];
+      }
+      const parentId = nodes[id].parentId;
+      if (parentId && nodes[parentId]) {
+        nodes[parentId].childrenIds = nodes[parentId].childrenIds.filter(i => i !== id);
+      }
+      deleteRecursive(id);
+      activeToolbarId = null;
+      storageSave(nodes, false);
+      render();
+    }
+
+    function triggerFile(nodeId, type) {
+      currentAttachNodeId = nodeId;
+      const input = document.getElementById('file-input');
+      input.accept = type === 'image' ? 'image/*' : 'audio/*';
+      input.onchange = e => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+          saveStateForUndo();
+          const node = nodes[currentAttachNodeId];
+          const count = node.boxes.length;
+          
+          const newMediaBox = {
+            id: 'media_' + Date.now(),
+            type: type,
+            data: reader.result,
+            offsetX: (count * 40) - 40,
+            offsetY: 60 + (count * 30),
+            width: 240
+          };
+          
+          node.boxes.push(newMediaBox);
+          node.isSelected = true;
+          storageSave(nodes, false);
+          render();
+        };
+        reader.readAsDataURL(file);
+      };
+      input.click();
+    }
+
+    window.onload = init;
+  </script>
+</body>
+</html>
