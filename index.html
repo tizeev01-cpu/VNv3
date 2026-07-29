@@ -158,8 +158,8 @@
 <body>
 
   <div class="top-controls">
-    <button class="control-btn" onclick="undo()">↩ Назад</button>
-    <button class="control-btn" onclick="centerCanvas()">🎯 В центр</button>
+    <button class="control-btn" onclick="undo()">↩ </button>
+    <button class="control-btn" onclick="centerCanvas()"> В центр</button>
     <button class="control-btn" onclick="exportBackup()">📥 Бэкап</button>
     <button class="control-btn" onclick="importBackup()">📤 Восстановить</button>
   </div>
@@ -561,7 +561,7 @@
 
             boxDiv.innerHTML = `
               <div class="box-drag-handle">
-                <span>::: (Зажать для переноса)</span>
+                <span>::: </span>
                 <button class="btn-delete-box" onclick="removeBox('${node.id}', '${box.id}')">✕</button>
               </div>
               ${innerBody}
