@@ -144,12 +144,12 @@
     /* Панель верхних кнопок управления */
     .top-controls {
       position: fixed; top: 16px; left: 16px; z-index: 100;
-      display: flex; gap: 8px;
+      display: flex; gap: 6px; flex-wrap: wrap;
     }
 
     .control-btn {
       background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.2);
-      padding: 8px 14px; border-radius: 20px; font-size: 12px; backdrop-filter: blur(5px);
+      padding: 6px 12px; border-radius: 20px; font-size: 11px; backdrop-filter: blur(5px);
       cursor: pointer;
     }
     .control-btn:active { background: rgba(255,255,255,0.3); }
@@ -158,8 +158,10 @@
 <body>
 
   <div class="top-controls">
-    <button class="control-btn" onclick="undo()"> ↩ </button>
-    <button class="control-btn" onclick="centerCanvas()"> В центр</button>
+    <button class="control-btn" onclick="undo()">↩ Назад</button>
+    <button class="control-btn" onclick="centerCanvas()">🎯 В центр</button>
+    <button class="control-btn" onclick="exportBackup()">📥 Бэкап</button>
+    <button class="control-btn" onclick="importBackup()">📤 Восстановить</button>
   </div>
 
   <div id="canvas-container">
@@ -170,6 +172,7 @@
   </div>
 
   <input type="file" id="file-input" style="display:none">
+  <input type="file" id="backup-input" accept=".json" style="display:none" onchange="handleImportFile(event)">
 
   <script>
     let nodes = {};
@@ -192,6 +195,48 @@
 
     const world = document.getElementById('world');
     const container = document.getElementById('canvas-container');
+
+    // ФУНКЦИИ РЕЗЕРВНОГО КОПИРОВАНИЯ
+    function exportBackup() {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(nodes, null, 2));
+      const downloadAnchor = document.createElement('a');
+      const date = new Date().toISOString().slice(0, 10);
+      
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", `notes_backup_${date}.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+    }
+
+    function importBackup() {
+      document.getElementById('backup-input').click();
+    }
+
+    function handleImportFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const importedNodes = JSON.parse(e.target.result);
+          if (typeof importedNodes === 'object' && importedNodes !== null) {
+            saveStateForUndo();
+            nodes = importedNodes;
+            storageSave(nodes, false);
+            render();
+            alert('Резервная копия успешно восстановлена!');
+          } else {
+            alert('Ошибка: неверный формат файла бэкапа');
+          }
+        } catch (err) {
+          alert('Ошибка при чтении файла бэкапа');
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = ''; // сброс инпута
+    }
 
     function saveStateForUndo() {
       if (historyStack.length > 20) historyStack.shift();
@@ -333,14 +378,13 @@
         return;
       }
 
-      // ПЛАВНЫЙ ЗУМ (Сглаженное приближение / отдаление)
+      // ПЛАВНЫЙ ЗУМ
       if (e.touches.length === 2 && startDistance > 0) {
         const currentDistance = Math.hypot(
           e.touches[0].clientX - e.touches[1].clientX,
           e.touches[0].clientY - e.touches[1].clientY
         );
         
-        // Коэффициент чувствительности (0.5 делаeт масштаб плавной рессорой)
         const rawZoomFactor = currentDistance / startDistance;
         const smoothZoomFactor = 1 + (rawZoomFactor - 1) * 0.5;
         
@@ -517,7 +561,7 @@
 
             boxDiv.innerHTML = `
               <div class="box-drag-handle">
-                <span>::: </span>
+                <span>::: (Зажать для переноса)</span>
                 <button class="btn-delete-box" onclick="removeBox('${node.id}', '${box.id}')">✕</button>
               </div>
               ${innerBody}
@@ -681,3 +725,4 @@
   </script>
 </body>
 </html>
+
