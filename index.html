@@ -6,7 +6,12 @@
   <meta name="color-scheme" content="only dark">
   <title>Визуальные Заметки</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; }
+    * { 
+      box-sizing: border-box; margin: 0; padding: 0; 
+      user-select: none; -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+    
     body, html { 
       width: 100%; height: 100%; overflow: hidden; 
       background: #0a0a0a; color: #fff; 
@@ -41,9 +46,9 @@
 
     /* Точка */
     .node-dot {
-      width: 28px; height: 28px; border-radius: 50%; border: 2.5px solid #fff;
+      width: 32px; height: 32px; border-radius: 50%; border: 2.5px solid #fff;
       background: #000; display: flex; align-items: center; justify-content: center;
-      cursor: grab; transition: background 0.2s, box-shadow 0.2s;
+      transition: background 0.2s, box-shadow 0.2s;
       touch-action: none;
     }
 
@@ -52,17 +57,17 @@
     }
 
     .node-dot-inner {
-      width: 8px; height: 8px; border-radius: 50%; background: #fff; pointer-events: none;
+      width: 10px; height: 10px; border-radius: 50%; background: #fff; pointer-events: none;
     }
 
     .node-dot.selected .node-dot-inner { background: #000; }
 
     /* Редактирование заголовка */
     .node-title-input {
-      margin-top: 4px; background: rgba(0,0,0,0.85); padding: 3px 8px;
-      border-radius: 4px; border: 1px solid rgba(255,255,255,0.25);
-      font-size: 13px; font-weight: bold; color: #fff; text-align: center;
-      outline: none; min-width: 80px; max-width: 190px; font-family: inherit;
+      margin-top: 6px; background: rgba(0,0,0,0.85); padding: 4px 10px;
+      border-radius: 6px; border: 1px solid rgba(255,255,255,0.25);
+      font-size: 14px; font-weight: bold; color: #fff; text-align: center;
+      outline: none; min-width: 90px; max-width: 190px; font-family: inherit;
       user-select: text; -webkit-user-select: text;
     }
     .node-title-input:focus {
@@ -71,7 +76,7 @@
 
     /* Мини-панель инструментов */
     .node-toolbar {
-      position: absolute; top: -38px; display: none; gap: 4px;
+      position: absolute; top: -42px; display: none; gap: 4px;
       background: #1e1e1e; border: 1px solid #444; border-radius: 8px;
       padding: 4px; box-shadow: 0 4px 12px rgba(0,0,0,0.7); z-index: 10;
       white-space: nowrap;
@@ -80,8 +85,8 @@
     .node-toolbar.active { display: flex; }
 
     .tool-btn {
-      background: #333; color: #fff; border: none; padding: 4px 8px;
-      border-radius: 4px; font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 2px;
+      background: #333; color: #fff; border: none; padding: 6px 10px;
+      border-radius: 6px; font-size: 12px; display: flex; align-items: center; gap: 2px;
     }
     .tool-btn:active { background: #555; }
     .tool-btn.danger { color: #ff5252; }
@@ -98,21 +103,21 @@
 
     /* Шапка перетаскивания поля */
     .box-drag-handle {
-      width: 100%; height: 16px; background: rgba(255,255,255,0.08);
-      border-radius: 4px; cursor: move; display: flex; align-items: center;
-      justify-content: space-between; padding: 0 6px; color: #888; font-size: 10px;
+      width: 100%; height: 22px; background: rgba(255,255,255,0.08);
+      border-radius: 4px; display: flex; align-items: center;
+      justify-content: space-between; padding: 0 8px; color: #aaa; font-size: 11px;
       touch-action: none;
     }
 
     .btn-delete-box {
       background: transparent; border: none; color: #888; 
-      font-size: 11px; cursor: pointer; line-height: 1;
+      font-size: 14px; padding: 2px 6px; line-height: 1;
     }
-    .btn-delete-box:hover { color: #ff5252; }
+    .btn-delete-box:active { color: #ff5252; }
 
     .node-text-editor {
       width: 100%; background: transparent; border: none; color: #ddd;
-      font-size: 13px; resize: none; outline: none; min-height: 38px;
+      font-size: 14px; resize: none; outline: none; min-height: 40px;
       font-family: inherit; line-height: 1.4; overflow: hidden;
       user-select: text; -webkit-user-select: text;
     }
@@ -128,29 +133,26 @@
       border-radius: 4px; display: block; pointer-events: none;
     }
     
-    .media-card-content audio { width: 100%; height: 32px; }
+    .media-card-content audio { width: 100%; height: 36px; }
 
     /* Кнопка изменения размера карточки в правом нижнем углу */
     .resize-handle {
-      position: absolute; right: 0; bottom: 0; width: 18px; height: 18px;
-      cursor: se-resize; touch-action: none; display: flex; align-items: center;
-      justify-content: center; font-size: 10px; color: rgba(255,255,255,0.5);
+      position: absolute; right: 0; bottom: 0; width: 22px; height: 22px;
+      touch-action: none; display: flex; align-items: center;
+      justify-content: center; font-size: 11px; color: rgba(255,255,255,0.5);
       border-top-left-radius: 4px; background: rgba(255,255,255,0.1);
     }
-    .resize-handle:after {
-      content: '◢';
-    }
+    .resize-handle:after { content: '◢'; }
 
     /* Панель верхних кнопок управления */
     .top-controls {
-      position: fixed; top: 16px; left: 16px; z-index: 100;
+      position: fixed; top: 12px; left: 12px; z-index: 100;
       display: flex; gap: 6px; flex-wrap: wrap;
     }
 
     .control-btn {
       background: rgba(255,255,255,0.15); color: #fff; border: 1px solid rgba(255,255,255,0.2);
-      padding: 6px 12px; border-radius: 20px; font-size: 11px; backdrop-filter: blur(5px);
-      cursor: pointer;
+      padding: 8px 14px; border-radius: 20px; font-size: 12px; backdrop-filter: blur(5px);
     }
     .control-btn:active { background: rgba(255,255,255,0.3); }
   </style>
@@ -158,8 +160,8 @@
 <body>
 
   <div class="top-controls">
-    <button class="control-btn" onclick="undo()">↩ </button>
-    <button class="control-btn" onclick="centerCanvas()"> В центр</button>
+    <button class="control-btn" onclick="undo()">↩ Назад</button>
+    <button class="control-btn" onclick="centerCanvas()">🎯 В центр</button>
     <button class="control-btn" onclick="exportBackup()">📥 Бэкап</button>
     <button class="control-btn" onclick="importBackup()">📤 Восстановить</button>
   </div>
@@ -196,17 +198,34 @@
     const world = document.getElementById('world');
     const container = document.getElementById('canvas-container');
 
-    // ФУНКЦИИ РЕЗЕРВНОГО КОПИРОВАНИЯ
+    // БЭКАПЫ
     function exportBackup() {
-      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(nodes, null, 2));
-      const downloadAnchor = document.createElement('a');
-      const date = new Date().toISOString().slice(0, 10);
-      
-      downloadAnchor.setAttribute("href", dataStr);
-      downloadAnchor.setAttribute("download", `notes_backup_${date}.json`);
-      document.body.appendChild(downloadAnchor);
-      downloadAnchor.click();
-      downloadAnchor.remove();
+      try {
+        const rawData = localStorage.getItem('visual_notes_v5_db');
+        if (!rawData) {
+          alert('База данных пуста!');
+          return;
+        }
+        
+        // Копируем напрямую в буфер обмена
+        navigator.clipboard.writeText(rawData).then(() => {
+          alert('УСПЕХ! Весь бэкап скопирован в буфер обмена. Вставь его и сохрани в любое текстовое приложение (например, в Telegram/Заметки)!');
+        }).catch(err => {
+          // Если браузер запретил доступ к буферу, выводим в текстовое поле на экране
+          showEmergencyTextarea(rawData);
+        });
+      } catch (e) {
+        alert('Ошибка при чтении: ' + e.message);
+      }
+    }
+
+    function showEmergencyTextarea(text) {
+      let area = document.createElement('textarea');
+      area.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:999999;background:#111;color:#fff;font-size:12px;padding:10px;';
+      area.value = text;
+      document.body.appendChild(area);
+      area.select();
+      alert('Выдели весь текст на экране, скопируй его вручную и сохрани в надежное место!');
     }
 
     function importBackup() {
@@ -226,16 +245,16 @@
             nodes = importedNodes;
             storageSave(nodes, false);
             render();
-            alert('Резервная копия успешно восстановлена!');
+            alert('Восстановлено!');
           } else {
-            alert('Ошибка: неверный формат файла бэкапа');
+            alert('Ошибка формата');
           }
         } catch (err) {
-          alert('Ошибка при чтении файла бэкапа');
+          alert('Ошибка чтения файла');
         }
       };
       reader.readAsText(file);
-      event.target.value = ''; // сброс инпута
+      event.target.value = '';
     }
 
     function saveStateForUndo() {
@@ -283,7 +302,7 @@
       }
     }
 
-    // ТАЧ И ИВЕНТ-ДВИЖОК
+    // ЧИСТЫЙ TOUCH-ДВИЖОК ДЛЯ ТЕЛЕФОНА
     container.addEventListener('touchstart', e => {
       const touch = e.touches[0];
       const targetDot = e.target.closest('.node-dot');
@@ -378,7 +397,6 @@
         return;
       }
 
-      // ПЛАВНЫЙ ЗУМ
       if (e.touches.length === 2 && startDistance > 0) {
         const currentDistance = Math.hypot(
           e.touches[0].clientX - e.touches[1].clientX,
@@ -471,8 +489,8 @@
           const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
           path.setAttribute('class', 'node-line');
           
-          const startX = parent.x, startY = parent.y + 14;
-          const endX = node.x, endY = node.y + 14;
+          const startX = parent.x, startY = parent.y + 16;
+          const endX = node.x, endY = node.y + 16;
           const deltaY = (endY - startY) / 2;
           
           path.setAttribute('d', `M ${startX} ${startY} C ${startX} ${startY + deltaY}, ${endX} ${endY - deltaY}, ${endX} ${endY}`);
@@ -493,7 +511,7 @@
 
             const boxPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
             boxPath.setAttribute('class', 'box-line');
-            boxPath.setAttribute('d', `M ${node.x} ${node.y + 14} L ${absoluteBoxX} ${absoluteBoxY}`);
+            boxPath.setAttribute('d', `M ${node.x} ${node.y + 16} L ${absoluteBoxX} ${absoluteBoxY}`);
             svgEl.appendChild(boxPath);
           });
         }
@@ -535,8 +553,7 @@
 
           <input class="node-title-input" value="${node.title}" 
             onfocus="activeToolbarId = '${node.id}'; renderToolbars();"
-            oninput="updateTitle('${node.id}', this.value)"
-            onchange="updateTitle('${node.id}', this.value)" />
+            oninput="updateTitle('${node.id}', this.value)" />
         `;
         containerEl.appendChild(div);
 
@@ -561,7 +578,7 @@
 
             boxDiv.innerHTML = `
               <div class="box-drag-handle">
-                <span>::: </span>
+                <span>::: (Перетащить)</span>
                 <button class="btn-delete-box" onclick="removeBox('${node.id}', '${box.id}')">✕</button>
               </div>
               ${innerBody}
