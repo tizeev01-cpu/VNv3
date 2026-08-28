@@ -248,7 +248,7 @@
       }
     }
 
-    // БЭКАП И ВОССТАНОВЛЕНИЕ ДАННЫХ В ФАЙЛ
+    // --- ФУНКЦИИ БЭКАПА И ВОССТАНОВЛЕНИЯ C МАРКЕРОМ КОДИРОВКИ UTF-8 ---
     function exportBackup() {
       try {
         if (!nodes || Object.keys(nodes).length === 0) {
@@ -257,20 +257,27 @@
         }
 
         const dataStr = JSON.stringify(nodes, null, 2);
+        
+        // Добавление маркера \uFEFF гарантирует правильное сохранение кириллицы и данных в UTF-8
+        const blob = new Blob(['\uFEFF' + dataStr], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        
         const fileName = `visual_notes_backup_${Date.now()}.json`;
 
-        // Использование Data URL обходит блокировки скачивания файлов в WebView/PWA
-        const encodedUri = "data:application/json;charset=utf-8," + encodeURIComponent(dataStr);
-        
-        const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
-        link.setAttribute("download", fileName);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
         
         document.body.appendChild(link);
         link.click();
-        document.body.removeChild(link);
+        
+        setTimeout(() => {
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        }, 500);
+
       } catch (e) {
-        alert('Ошибка при формировании файла бэкапа: ' + e.message);
+        alert('Ошибка при выгрузке файла: ' + e.message);
       }
     }
 
@@ -285,9 +292,17 @@
       if (!file) return;
 
       const reader = new FileReader();
+      
       reader.onload = async (e) => {
         try {
-          let parsedData = JSON.parse(e.target.result);
+          let rawText = e.target.result;
+
+          // Очистка от маркера BOM перед парсингом JSON
+          if (rawText.charCodeAt(0) === 0xFEFF) {
+            rawText = rawText.slice(1);
+          }
+
+          let parsedData = JSON.parse(rawText);
 
           if (typeof parsedData === 'string') {
             parsedData = JSON.parse(parsedData);
@@ -307,7 +322,7 @@
         }
       };
       
-      reader.readAsText(file);
+      reader.readAsText(file, 'UTF-8');
     }
 
     function saveStateForUndo() {
