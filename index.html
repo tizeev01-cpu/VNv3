@@ -122,7 +122,7 @@
       user-select: text; -webkit-user-select: text;
     }
 
-    /* Адаптированный контент карточек с фото */
+    /* Контент карточек */
     .media-card-content {
       width: 100%; display: flex; justify-content: center; align-items: center; overflow: hidden;
       position: relative;
@@ -135,7 +135,7 @@
     
     .media-card-content audio { width: 100%; height: 36px; }
 
-    /* Кнопка изменения размера карточки в правом нижнем углу */
+    /* Изменение размера карточки */
     .resize-handle {
       position: absolute; right: 0; bottom: 0; width: 22px; height: 22px;
       touch-action: none; display: flex; align-items: center;
@@ -144,7 +144,7 @@
     }
     .resize-handle:after { content: '◢'; }
 
-    /* Панель верхних кнопок управления */
+    /* Панель верхних кнопок */
     .top-controls {
       position: fixed; top: 12px; left: 12px; z-index: 100;
       display: flex; gap: 6px; flex-wrap: wrap;
@@ -248,7 +248,6 @@
       }
     }
 
-    // --- ФУНКЦИИ БЭКАПА И ВОССТАНОВЛЕНИЯ C МАРКЕРОМ КОДИРОВКИ UTF-8 ---
     function exportBackup() {
       try {
         if (!nodes || Object.keys(nodes).length === 0) {
@@ -257,8 +256,6 @@
         }
 
         const dataStr = JSON.stringify(nodes, null, 2);
-        
-        // Добавление маркера \uFEFF гарантирует правильное сохранение кириллицы и данных в UTF-8
         const blob = new Blob(['\uFEFF' + dataStr], { type: 'application/json;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         
@@ -297,7 +294,6 @@
         try {
           let rawText = e.target.result;
 
-          // Очистка от маркера BOM перед парсингом JSON
           if (rawText.charCodeAt(0) === 0xFEFF) {
             rawText = rawText.slice(1);
           }
@@ -402,7 +398,6 @@
       }
     }
 
-    // TOUCH-ДВИЖОК
     container.addEventListener('touchstart', e => {
       const touch = e.touches[0];
       const targetDot = e.target.closest('.node-dot');
@@ -505,7 +500,6 @@
         
         const rawZoomFactor = currentDistance / startDistance;
         const smoothZoomFactor = 1 + (rawZoomFactor - 1) * 0.5;
-        
         const newScale = Math.min(Math.max(startScale * smoothZoomFactor, 0.35), 2.5);
         
         const centerTouchX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
@@ -809,43 +803,89 @@
       });
     }
 
+    // ВЫБОР ФАЙЛОВ И ДОБАВЛЕНИЕ ФОТО КАК ОТДЕЛЬНЫХ ПОДЗАМЕТОК
     function triggerFile(nodeId, type) {
       currentAttachNodeId = nodeId;
       const input = document.getElementById('file-input');
       input.accept = type === 'image' ? 'image/*' : 'audio/*';
-      input.onchange = async e => {
-        const file = e.target.files[0];
-        if (!file) return;
+      
+      // Включаем поддержку множественного выбора для изображений
+      if (type === 'image') {
+        input.setAttribute('multiple', 'true');
+      } else {
+        input.removeAttribute('multiple');
+      }
 
-        let resultData = '';
+      input.onchange = async e => {
+        const files = Array.from(e.target.files);
+        if (!files.length) return;
+
+        saveStateForUndo();
+        const parentNode = nodes[currentAttachNodeId];
+
         if (type === 'image') {
-          resultData = await compressImage(file);
+          // Выбор нескольких изображений — создаём для каждого отдельную подзаметку
+          for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            const resultData = await compressImage(file);
+            
+            const newId = 'node_' + Date.now() + '_' + i;
+            const count = parentNode.childrenIds.length;
+            const offsetX = (count % 2 === 0 ? 1 : -1) * (Math.floor(count / 2) + 1) * 180;
+            
+            const newX = parentNode.x + (offsetX === 0 ? 180 : offsetX);
+            const newY = parentNode.y + 200;
+
+            const photoTitle = file.name ? file.name.replace(/\.[^/.]+$/, "") : `Фото ${count + 1}`;
+
+            nodes[newId] = {
+              id: newId,
+              title: photoTitle,
+              boxes: [{
+                id: 'media_' + Date.now() + '_' + i,
+                type: 'image',
+                data: resultData,
+                offsetX: 0,
+                offsetY: 50,
+                width: 240
+              }],
+              parentId: parentNode.id,
+              childrenIds: [],
+              x: newX,
+              y: newY,
+              isSelected: true
+            };
+
+            parentNode.childrenIds.push(newId);
+          }
         } else {
-          resultData = await new Promise((res) => {
+          // Добавление аудиофайла в текущую заметку
+          const file = files[0];
+          const resultData = await new Promise((res) => {
             const r = new FileReader();
             r.onload = () => res(r.result);
             r.readAsDataURL(file);
           });
+
+          const count = parentNode.boxes.length;
+          const newMediaBox = {
+            id: 'media_' + Date.now(),
+            type: type,
+            data: resultData,
+            offsetX: (count * 40) - 40,
+            offsetY: 60 + (count * 30),
+            width: 240
+          };
+          
+          parentNode.boxes.push(newMediaBox);
+          parentNode.isSelected = true;
         }
 
-        saveStateForUndo();
-        const node = nodes[currentAttachNodeId];
-        const count = node.boxes.length;
-        
-        const newMediaBox = {
-          id: 'media_' + Date.now(),
-          type: type,
-          data: resultData,
-          offsetX: (count * 40) - 40,
-          offsetY: 60 + (count * 30),
-          width: 240
-        };
-        
-        node.boxes.push(newMediaBox);
-        node.isSelected = true;
+        activeToolbarId = null;
         await storageSave(nodes, false);
         render();
       };
+      
       input.click();
     }
 
