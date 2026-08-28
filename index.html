@@ -174,7 +174,7 @@
   </div>
 
   <input type="file" id="file-input" style="display:none">
-  <input type="file" id="backup-input" style="display:none" onchange="handleImportFile(event)">
+  <input type="file" id="backup-input" accept=".json,application/json" style="display:none" onchange="handleImportFile(event)">
 
   <script>
     let nodes = {};
@@ -248,25 +248,29 @@
       }
     }
 
-    // БЭКАПЫ
+    // БЭКАП И ВОССТАНОВЛЕНИЕ ДАННЫХ В ФАЙЛ
     function exportBackup() {
       try {
         if (!nodes || Object.keys(nodes).length === 0) {
           alert('Нет данных для выгрузки!');
           return;
         }
+
         const dataStr = JSON.stringify(nodes, null, 2);
-        const blob = new Blob([dataStr], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `visual_notes_backup_${Date.now()}.json`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
+        const fileName = `visual_notes_backup_${Date.now()}.json`;
+
+        // Использование Data URL обходит блокировки скачивания файлов в WebView/PWA
+        const encodedUri = "data:application/json;charset=utf-8," + encodeURIComponent(dataStr);
+        
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", fileName);
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
       } catch (e) {
-        alert('Ошибка бэкапа: ' + e.message);
+        alert('Ошибка при формировании файла бэкапа: ' + e.message);
       }
     }
 
@@ -284,8 +288,7 @@
       reader.onload = async (e) => {
         try {
           let parsedData = JSON.parse(e.target.result);
-          
-          // Если файлы импортируются из старой версии в виде JSON-строки
+
           if (typeof parsedData === 'string') {
             parsedData = JSON.parse(parsedData);
           }
@@ -295,14 +298,15 @@
             nodes = parsedData;
             await storageSave(nodes, false);
             render();
-            alert('Успешно восстановлено!');
+            alert('Данные из файла успешно восстановлены!');
           } else {
-            alert('Неверный формат файла!');
+            alert('Ошибка: неверная структура файла бэкапа.');
           }
         } catch (err) {
-          alert('Ошибка считывания файла: ' + err.message);
+          alert('Ошибка при чтении файла: ' + err.message);
         }
       };
+      
       reader.readAsText(file);
     }
 
@@ -330,7 +334,6 @@
     async function init() {
       let saved = await dbLoad();
 
-      // Авто-миграция из localStorage
       if (!saved) {
         try {
           const localRaw = localStorage.getItem('visual_notes_v5_db');
@@ -353,7 +356,6 @@
         });
         nodes = saved;
       } else if (!nodes || Object.keys(nodes).length === 0) {
-        // Создавать дефолтный узел только при абсолютно чистом старте
         nodes = {
           'root': {
             id: 'root', title: 'Заметки', 
@@ -830,7 +832,8 @@
         render();
       };
       input.click();
-  
+    }
+
     window.onload = init;
   </script>
 </body>
